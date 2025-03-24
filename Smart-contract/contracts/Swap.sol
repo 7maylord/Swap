@@ -60,10 +60,11 @@ contract Swap {
         uint256 amountX = (liquidityAmount * reserveX) / totalLiquidity;
         uint256 amountY = (liquidityAmount * reserveY) / totalLiquidity;
 
+        liquidityProviders[msg.sender] -= liquidityAmount;        
+        totalLiquidity -= liquidityAmount;
         reserveX -= amountX;
         reserveY -= amountY;
-        totalLiquidity -= liquidityAmount;
-        liquidityProviders[msg.sender] -= liquidityAmount;
+        
 
         IERC20(tokenX).safeTransfer(msg.sender, amountX);
         IERC20(tokenY).safeTransfer(msg.sender, amountY);
@@ -73,7 +74,7 @@ contract Swap {
 
     function swap(uint256 amountIn, bool isTokenX, address to) external {
         if (amountIn == 0) revert InvalidAmount();
-        if (to == address(0) || to == tokenX || to == tokenY) revert InvalidAddress();
+        if (to == address(0)) revert InvalidAddress();
 
         address inputToken = isTokenX ? tokenX : tokenY;
         address outputToken = isTokenX ? tokenY : tokenX;
@@ -93,12 +94,19 @@ contract Swap {
         if (amountOut == 0 || amountOut >= reserveOut) revert SwapFailed();
 
         // Update reserves dynamically
-        reserveX = IERC20(tokenX).balanceOf(address(this));
-        reserveY = IERC20(tokenY).balanceOf(address(this));
+        reserveIn += amountIn;
+        reserveOut -= amountOut;
 
         // Transfer output tokens to the recipient
         IERC20(outputToken).safeTransfer(to, amountOut);
 
+        _updateReserves();
+
         emit Swapped(inputToken, outputToken, amountIn, amountOut);
+    }
+    
+    function _updateReserves() internal {
+        reserveX = IERC20(tokenX).balanceOf(address(this));
+        reserveY = IERC20(tokenY).balanceOf(address(this));
     }
 }
